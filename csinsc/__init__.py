@@ -105,6 +105,44 @@ class _Label:
 goto = None
 label = _Label()
 
+######################### color constants #########################
+#             abstracted for both termcolour and curses           #
+###################################################################
+class Colour:
+    grey = '\033[30m'
+    red = '\033[31m'
+    green = '\033[32m'
+    yellow = '\033[33m'
+    blue = '\033[34m'
+    magenta = '\033[35m'
+    cyan = '\033[36m'
+    white = '\033[37m'
+    reset = '\033[0m'
+
+class Highlight:
+    greg = '\033[40m'
+    red = '\033[41m'
+    green = '\033[42m'
+    yellow = '\033[43m'
+    blue = '\033[44m'
+    magenta = '\033[45m'
+    cyan = '\033[46m'
+    white = '\033[47m'
+
+class Attribute:
+    bold = '\033[1m'
+    dark = '\033[2m'
+    underline = '\033[4m'
+    blink = '\033[5m'
+    reverse = '\033[7m'
+    concealed = '\033[8m'
+
+############### color lookup for curses ###############
+curses_lookup = {}
+
+
+
+
 # coding: utf-8
 # Copyright (c) 2008-2011 Volvox Development Team
 #
@@ -311,7 +349,7 @@ class SimpleScreen:
 from curses import *
 
 class Screen(object):
-  def __init__(self, width = 40, height = 25, fps = 60, refresh_on_clear = True):
+  def __init__(self, width = 40, height = 25, fps = 60, auto_setup = True, refresh_on_clear = True):
     self.width = width
     self.height = height
 
@@ -329,6 +367,9 @@ class Screen(object):
     self.y = 0
 
     self.refresh_on_clear = refresh_on_clear
+
+    if auto_setup:
+        self.setup()
 
     self.clear()
 
@@ -357,6 +398,9 @@ class Screen(object):
     echo()
     curs_set(1)
     endwin()
+
+  def shutdown(self):
+    self.teardown()
 
   def clear(self, clear_ch = " ", reset_cursor = True):
     if self.refresh_on_clear:
