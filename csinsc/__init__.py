@@ -120,7 +120,7 @@ class Colour:
     reset = '\033[0m'
 
 class Highlight:
-    greg = '\033[40m'
+    grey = '\033[40m'
     red = '\033[41m'
     green = '\033[42m'
     yellow = '\033[43m'
@@ -129,7 +129,7 @@ class Highlight:
     cyan = '\033[46m'
     white = '\033[47m'
 
-class Attribute:
+class Style:
     bold = '\033[1m'
     dark = '\033[2m'
     underline = '\033[4m'
@@ -345,6 +345,10 @@ class SimpleScreen:
 # Simple curses wrapper so console based text games can be easily  #
 # written, tweaked, and analysed.                                  #
 ####################################################################
+def simple_clear(lines = 40):
+    for _ in range(lines):
+        print()
+
 
 from curses import *
 
@@ -354,6 +358,7 @@ class Screen(object):
     self.height = height
 
     self.screen = [[] * self.width] * self.height
+
 
     self.keys = {}
     for key in range(512):
@@ -455,7 +460,7 @@ class Screen(object):
     self.screen[self.height - 1][0] = '\''
     self.screen[self.height - 1][self.width - 1] = '\''    
 
-  def printAt(self, text, x, y):
+  def printAt(self, text, x, y, color = None, bgcolor = None):
     x = int(x)
     y = int(y)
     for dx, ch in enumerate(text):
