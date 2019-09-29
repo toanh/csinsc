@@ -359,6 +359,8 @@ class Screen(object):
 
     self.screen = [[] * self.width] * self.height
 
+    self.colour_screen = [[] * self.width] * self.height
+
 
     self.keys = {}
     for key in range(512):
@@ -372,6 +374,27 @@ class Screen(object):
     self.y = 0
 
     self.refresh_on_clear = refresh_on_clear
+
+    #0:black, 1:red, 2:green, 3:yellow, 4:blue, 5:magenta, 6:cyan, and 7:white
+    self.colours = {}
+    self.colours[Colour.grey] = 0
+    self.colours[Colour.red] = 1
+    self.colours[Colour.green] = 2
+    self.colours[Colour.yellow] = 3
+    self.colours[Colour.blue] = 4
+    self.colours[Colour.magenta] = 5
+    self.colours[Colour.cyan] = 6
+    self.colours[Colour.white] = 7
+
+    self.highlights = {}
+    self.highlights[Highlight.grey] = 0
+    self.highlights[Highlight.red] = 1
+    self.highlights[Highlight.green] = 2
+    self.highlights[Highlight.yellow] = 3
+    self.highlights[Highlight.blue] = 4
+    self.highlights[Highlight.magenta] = 5
+    self.highlights[Highlight.cyan] = 6
+    self.highlights[Highlight.white] = 7
 
     if auto_setup:
         self.setup()
@@ -394,9 +417,15 @@ class Screen(object):
     initscr()
     noecho()
     curs_set(0)
+    start_color()
     self.win = newwin(self.height + 1, self.width + 1, 0, 0)
     self.win.keypad(1)
     self.win.nodelay(1)
+
+    for color in range(8):
+        for bgcolor in range(8):
+            init_pair(1 + (color * 8 + bgcolor), color, bgcolor)
+
 
   def teardown(self):
     self.win.keypad(0)
@@ -407,12 +436,15 @@ class Screen(object):
   def shutdown(self):
     self.teardown()
 
-  def clear(self, clear_ch = " ", reset_cursor = True):
+  def clear(self, clear_ch = " ", clear_col = 0, reset_cursor = True):
     if self.refresh_on_clear:
       self.refresh()
       
     for row in range(self.height):
       self.screen[row] = [clear_ch] * self.width
+
+    for row in range(self.height):
+      self.colour_screen[row] = [clear_col] * self.width
 
     if reset_cursor:
       self.x = 0
@@ -461,18 +493,27 @@ class Screen(object):
     self.screen[self.height - 1][self.width - 1] = '\''    
 
   def printAt(self, text, x, y, color = None, bgcolor = None):
+    if color is None:
+        color = Colour.white
+    if bgcolor is None:
+        bgcolor = Highlight.grey
     x = int(x)
     y = int(y)
     for dx, ch in enumerate(text):
       self.screen[y][x + dx] = ch
+      self.colour_screen[y][x + dx] = 1 + (self.colours[color] * 8 \
+                                           + self.highlights[bgcolor])
+
 
   def refresh(self):
     if self.win is None:
       self.setup()
 
     for y, row in enumerate(self.screen):
-      line = str("".join(row))
-      self.win.addstr(y, 0, line)
+        for x, ch in enumerate(row):
+            #line = str("".join(row))
+            color = self.colour_screen[y][x]
+            self.win.addstr(y, x, ch, color_pair(color))
 
     for key in range(512):
       self.keys[key] = False
