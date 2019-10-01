@@ -541,5 +541,12 @@ class Screen(object):
     def isKeyPressed(self, key):
         return self.keys[ord(key)]
 
+    def getKeysPressed(self):
+        keys = []
+        for key in self.keys.keys():
+            if self.keys[key] == True:
+                keys.append(key)
+        return keys
+
     def setFPS(self, fps):
         self.fps = fps
