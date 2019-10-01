@@ -353,9 +353,10 @@ def simple_clear(lines = 40):
 from curses import *
 
 class Screen(object):
-  def __init__(self, width = 40, height = 25, fps = 60, auto_setup = True, refresh_on_clear = True):
+  def __init__(self, width = 40, height = 25, colour = False, fps = 60, auto_setup = True, refresh_on_clear = True):
     self.width = width
     self.height = height
+    self.colourMode = colour
 
     self.screen = [[] * self.width] * self.height
 
@@ -417,14 +418,14 @@ class Screen(object):
     initscr()
     noecho()
     curs_set(0)
-    start_color()
     self.win = newwin(self.height + 1, self.width + 1, 0, 0)
     self.win.keypad(1)
     self.win.nodelay(1)
-
-    for color in range(8):
-        for bgcolor in range(8):
-            init_pair(1 + (color * 8 + bgcolor), color, bgcolor)
+    if self.colourMode:
+        start_color()
+        for color in range(8):
+            for bgcolor in range(8):
+                init_pair(1 + (color * 8 + bgcolor), color, bgcolor)
 
 
   def teardown(self):
@@ -443,8 +444,9 @@ class Screen(object):
     for row in range(self.height):
       self.screen[row] = [clear_ch] * self.width
 
-    for row in range(self.height):
-      self.colour_screen[row] = [clear_col] * self.width
+    if self.colourMode:
+        for row in range(self.height):
+          self.colour_screen[row] = [clear_col] * self.width
 
     if reset_cursor:
       self.x = 0
@@ -501,8 +503,10 @@ class Screen(object):
     y = int(y)
     for dx, ch in enumerate(text):
       self.screen[y][x + dx] = ch
-      self.colour_screen[y][x + dx] = 1 + (self.colours[color] * 8 \
-                                           + self.highlights[bgcolor])
+
+      if self.colourMode:
+          self.colour_screen[y][x + dx] = 1 + (self.colours[color] * 8 \
+                                               + self.highlights[bgcolor])
 
 
   def refresh(self):
@@ -510,10 +514,13 @@ class Screen(object):
       self.setup()
 
     for y, row in enumerate(self.screen):
-        for x, ch in enumerate(row):
-            #line = str("".join(row))
-            color = self.colour_screen[y][x]
-            self.win.addstr(y, x, ch, color_pair(color))
+        if not self.colourMode:
+            text = "".join(row)
+            self.win.addstr(y, 0, text)
+        else:
+            for x, ch in enumerate(row):
+                color = self.colour_screen[y][x]
+                self.win.addstr(y, x, ch, color_pair(color))
 
     for key in range(512):
       self.keys[key] = False
