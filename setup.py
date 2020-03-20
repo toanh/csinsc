@@ -5,13 +5,13 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="csinsc",
-    version="1.0.4.2",
+    version="1.0.4.4",
     author="Toan Huynh",
     author_email="toan@csinschools.io",
     description="Tools and libraries used in the CSinSchools course",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/toanhuynhcsinsc/csinsc",
+    url="https://github.com/toanh/csinsc",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

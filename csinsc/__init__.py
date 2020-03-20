@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 name = "csinsc"
-version = "1.0.3.3"
+version = "1.0.4.4"
 
 # for complete the blanks exercises
 __________ = None
@@ -446,7 +446,7 @@ class Screen(object):
 
     def clear(self, clear_ch=" ", clear_col=Colour.white, clear_bg=Highlight.grey, reset_cursor=True):
         # TODO: fix this so that black works
-        clear_col = 0
+        #clear_col = 0
         if self.refresh_on_clear:
             self.refresh()
 
@@ -455,7 +455,8 @@ class Screen(object):
 
         if self.colourMode:
             for row in range(self.height):
-                self.colour_screen[row] = [clear_col] * self.width
+                self.colour_screen[row] = [1 + (self.colours[clear_col] * 8 \
+                                                     + self.highlights[clear_bg])] * self.width
 
         if reset_cursor:
             self.x = 0
