@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 name = "csinsc"
-version = "1.0.0"
+version = "1.0.3.3"
 
 # for complete the blanks exercises
 __________ = None
@@ -501,19 +501,22 @@ class Screen(object):
         self.screen[self.height - 1][0] = '\''
         self.screen[self.height - 1][self.width - 1] = '\''
 
-    def printAt(self, text, x, y, color=None, bgcolor=None):
-        if color is None:
-            color = Colour.white
-        if bgcolor is None:
-            bgcolor = Highlight.grey
+    def printAt(self, text, x, y, colour=None, bgcolour=None):
+        if colour is None:
+            colour = Colour.white
+        if bgcolour is None:
+            bgcolour = Highlight.grey
         x = int(x)
         y = int(y)
         for dx, ch in enumerate(text):
             self.screen[y][x + dx] = ch
 
             if self.colourMode:
-                self.colour_screen[y][x + dx] = 1 + (self.colours[color] * 8 \
-                                                     + self.highlights[bgcolor])
+                self.colour_screen[y][x + dx] = 1 + (self.colours[colour] * 8 \
+                                                     + self.highlights[bgcolour])
+
+    def getCharAt(self, x, y):
+        return self.screen[y][x]
 
     def refresh(self):
         if self.win is None:

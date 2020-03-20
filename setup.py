@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="csinsc",
-    version="1.0.3.2",
+    version="1.0.4.2",
     author="Toan Huynh",
     author_email="toan@csinschools.io",
     description="Tools and libraries used in the CSinSchools course",
