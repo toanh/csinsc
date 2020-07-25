@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 name = "csinsc"
-version = "1.0.4.4"
+version = "1.1.0.6"
 
 # for complete the blanks exercises
 __________ = None
@@ -127,6 +127,8 @@ class Colour:
     magenta = '\033[35m'
     cyan = '\033[36m'
     white = '\033[37m'
+    # TODO: fix black
+    black = '\033[30m'
     reset = '\033[0m'
 
 
@@ -138,6 +140,8 @@ class Highlight:
     blue = '\033[44m'
     magenta = '\033[45m'
     cyan = '\033[46m'
+    # TODO: fix black
+    black = '\033[40m'
     white = '\033[47m'
 
 
@@ -357,22 +361,32 @@ def simple_clear(lines=40):
         print()
 
 
-from curses import *
+import termios, fcntl, sys, os
 
+import locale
+import copy
+#import xterm
+
+class Point:
+  def __init__(self, x = 0, y = 0):
+    self.x = x
+    self.y = y
 
 class Screen(object):
-    def __init__(self, width=40, height=25, colour=False, fps=60, auto_setup=True, refresh_on_clear=True):
+    def __init__(self, width=40, height=25, colour=True, fps=60, auto_setup=True, refresh_on_clear=False):
         self.width = width
         self.height = height
         self.colourMode = colour
 
-        self.screen = [[] * self.width] * self.height
-
-        self.colour_screen = [[] * self.width] * self.height
+        self.screen = None
 
         self.keys = {}
         for key in range(512):
             self.keys[key] = False
+        self.keys["vpad_up"] = False
+        self.keys["vpad_down"] = False
+        self.keys["vpad_left"] = False
+        self.keys["vpad_right"] = False            
 
         self.win = None
 
@@ -380,38 +394,32 @@ class Screen(object):
 
         self.x = 0
         self.y = 0
+        self.mouse_state = ""
+
+        self.mouse_x = -1
+        self.mouse_y = -1
 
         self.refresh_on_clear = refresh_on_clear
 
-        # 0:black, 1:red, 2:green, 3:yellow, 4:blue, 5:magenta, 6:cyan, and 7:white
         self.colours = {}
-        self.colours[Colour.grey] = 0
-        self.colours[Colour.red] = 1
-        self.colours[Colour.green] = 2
-        self.colours[Colour.yellow] = 3
-        self.colours[Colour.blue] = 4
-        self.colours[Colour.magenta] = 5
-        self.colours[Colour.cyan] = 6
-        self.colours[Colour.white] = 7
-
-        self.highlights = {}
-        self.highlights[Highlight.grey] = 0
-        self.highlights[Highlight.red] = 1
-        self.highlights[Highlight.green] = 2
-        self.highlights[Highlight.yellow] = 3
-        self.highlights[Highlight.blue] = 4
-        self.highlights[Highlight.magenta] = 5
-        self.highlights[Highlight.cyan] = 6
-        self.highlights[Highlight.white] = 7
+        self.colours[Colour.black] = [0, 0, 0]
+        self.colours[Colour.grey] = [150, 150, 150]
+        self.colours[Colour.red] = [255, 0, 0]
+        self.colours[Colour.green] = [0, 255, 0]
+        self.colours[Colour.yellow] = [255, 255, 0]
+        self.colours[Colour.blue] = [0, 0, 255]
+        self.colours[Colour.magenta] = [255, 0, 255]
+        self.colours[Colour.cyan] = [0, 255, 255]
+        self.colours[Colour.white] = [255, 255, 255]
 
         if auto_setup:
             self.setup()
 
         self.clear()
+        locale.setlocale(locale.LC_ALL, '')      
 
     def __del__(self):
-        if self.win is not None:
-            self.teardown()
+      self.teardown()
 
     def __enter__(self):
         self.setup()
@@ -421,49 +429,62 @@ class Screen(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.teardown()
 
-    def setup(self):
-        initscr()
-        noecho()
-        curs_set(0)
-        self.win = newwin(self.height + 1, self.width + 1, 0, 0)
-        self.win.keypad(1)
-        self.win.nodelay(1)
-        if self.colourMode:
-            start_color()
-            use_default_colors()
-            for color in range(8):
-                for bgcolor in range(8):
-                    init_pair(1 + (color * 8 + bgcolor), color, bgcolor)
+    def setup(self):      
+      self.fd = sys.stdin.fileno()
+
+      self.oldterm = termios.tcgetattr(self.fd)
+
+      newattr = termios.tcgetattr(self.fd)
+      newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+      termios.tcsetattr(self.fd, termios.TCSANOW, newattr)
+
+      # hide cursor
+      print("\033[?25l")
+
+      print("\033[?1003h") # click detection
+      print("\033[?1006h") # make it better
+      print("\033[?7l") # don't  line wrap      
 
     def teardown(self):
-        self.win.keypad(0)
-        echo()
-        curs_set(1)
-        endwin()
+      print(flush=True, end="")
+      termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.oldterm)
+      fcntl.fcntl(self.fd, fcntl.F_SETFL, self.oldflags)
+      print("\033[?25h", end="") # show cursor
+      print("\033[?1003l", end="") # disable click detection
+      print("\033[?1006l", end="") # make it better
+      print("\033[?7h", end="") # line wrap         
 
     def shutdown(self):
         self.teardown()
 
-    def clear(self, clear_ch=" ", clear_col=Colour.white, clear_bg=Highlight.grey, reset_cursor=True):
+    def getMousePos(self):
+      return Point(self.mouse_x, self.mouse_y)
+
+    def clear(self, clear_ch=" ", clear_col=[255, 255, 255], clear_bg=[0, 0, 0], reset_cursor=True):
         # TODO: fix this so that black works
         #clear_col = 0
-        if self.refresh_on_clear:
+        if self.refresh_on_clear and self.screen is not None:
             self.refresh()
 
-        for row in range(self.height):
-            self.screen[row] = [clear_ch] * self.width
+        self.screen = []
+        for _ in range(self.height):
+          row = []
+          for __ in range(self.width):
+            row.append(clear_ch)
+          self.screen.append(row)
 
-        if self.colourMode:
-            for row in range(self.height):
-                self.colour_screen[row] = [1 + (self.colours[clear_col] * 8 \
-                                                     + self.highlights[clear_bg])] * self.width
+        self.colour_screen = []
+        for _ in range(self.height):
+          self.colour_screen.append([[clear_col[0],
+                                      clear_col[1],
+                                      clear_col[2],
+                                      clear_bg[0],
+                                      clear_bg[1],
+                                      clear_bg[2]]] * self.width)
 
         if reset_cursor:
             self.x = 0
             self.y = 0
-
-    def getch(self):
-        return self.win.getch()
 
     def print(self, text, newline=True):
         x = int(self.x)
@@ -487,70 +508,265 @@ class Screen(object):
         self.x = x
         self.y = y
 
-        # if self.auto_refresh:
-        #  self.refresh()
+    
+    def messageBox(self, message, title = ""):
+      # make a copy of the Screen
+      screen = copy.deepcopy(self.screen)
+
+      msgWidth = self.width - 8
+
+      lines = []
+
+      paddingLen = (msgWidth - 2 - len(title)) / 2.0
+      # left padding is rounded down, right padding is rounded accurately
+      # to cater for odd lengthed text
+      lines.append("╔" + "-" * int(paddingLen) + title + "-" * int(paddingLen + 0.5) + "╗")
+
+      line = "|"
+      words = message.split(" ")
+      for word in words:
+        # disregard the space at the end but adding the | also
+        lineLen = len(line) + len(word)
+        if lineLen >= msgWidth:
+          lines.append(line[:-1] + (msgWidth - len(line)) * " " + "|")
+          # new line
+          line = "|"
+        line += word + " "
+      lines.append(line[:-1] + (msgWidth - len(line)) * " " + "|")
+
+      endText = "Press [SPACE]"
+      paddingLen = (msgWidth - 2 - len(endText)) / 2.0
+      lines.append("╚" + "-" * int(paddingLen) + endText + "-" * int(paddingLen + 0.5) + "╝")
+
+      if len(lines) > self.height - 4:
+        raise Exception("Too much text for messageBox.")
+
+      for y, line in enumerate(lines):
+        self.printAt(line, 4, (self.height - len(lines))//2 + y)
+
+      self.refresh()
+      while not self.isKeyPressed(' '):
+        self.refresh()
+
+      self.screen = copy.deepcopy(screen)
 
     def border(self):
-        for x in range(1, self.width - 1):
+        for x in range(1, self.width - 2):
             self.screen[0][x] = '-'
             self.screen[self.height - 1][x] = '-'
         for y in range(1, self.height - 1):
             self.screen[y][0] = '|'
-            self.screen[y][self.width - 1] = '|'
+            self.screen[y][self.width - 2] = '|'
         self.screen[0][0] = '.'
-        self.screen[0][self.width - 1] = '.'
+        self.screen[0][self.width - 2] = '.'
         self.screen[self.height - 1][0] = '\''
-        self.screen[self.height - 1][self.width - 1] = '\''
+        self.screen[self.height - 1][self.width - 2] = '\''
 
     def printAt(self, text, x, y, colour=None, bgcolour=None):
         if colour is None:
-            colour = Colour.white
+          colour = [255,255,255]
+        elif type(colour) != list:
+          colour = self.colours[colour]
+
         if bgcolour is None:
-            bgcolour = Highlight.grey
+            bgcolour = [0,0,0]
+        elif type(bgcolour) != list:
+          bgcolour = self.colours[bgcolour]
+
         x = int(x)
         y = int(y)
-        for dx, ch in enumerate(text):
+        if y < 0 or y > self.height - 1:
+          return
+        for dx, ch in enumerate(text):            
+            if (x + dx) < 0:
+              continue
+            elif (x + dx) > self.width - 1:
+              return
+            
+            # transparency
+            if ch == '.':
+              continue
+
             self.screen[y][x + dx] = ch
 
             if self.colourMode:
-                self.colour_screen[y][x + dx] = 1 + (self.colours[colour] * 8 \
-                                                     + self.highlights[bgcolour])
-
+                self.colour_screen[y][x + dx] = [colour[0],
+                                                 colour[1],
+                                                 colour[2],
+                                                 bgcolour[0],
+                                                 bgcolour[1],
+                                                 bgcolour[2]]
+                                    
     def getCharAt(self, x, y):
-        return self.screen[y][x]
+        return self.screen[int(y)][int(x)]
 
+    # alias for refresh
+    def reveal(self):
+      return self.refresh()
+        
     def refresh(self):
-        if self.win is None:
-            self.setup()
+      print("\033[%d;%dH" % (0, 0))
+      prevColourCode = ""
+      for row in range(len(self.screen)):
+        line = ""
+        for col in range(len(self.screen[0])):
+          colour = self.colour_screen[row][col]
+          colourCode = "\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm" % ( colour[0],
+                                                                    colour[1],
+                                                                    colour[2],
+                                                                    colour[3],
+                                                                    colour[4],
+                                                                    colour[5] )
+          
+          if colourCode == prevColourCode:
+            line += self.screen[row][col]# + " "  
+          else:
+            line += colourCode + self.screen[row][col]# + " "
+          prevColourCode = colourCode
+        print(line, flush=True) 
 
-        for y, row in enumerate(self.screen):
-            if not self.colourMode:
-                text = "".join(row)
-                self.win.addstr(y, 0, text)
+      # clearing the glitch on the right side of the screen
+      # when a double replacement character � is glitched instead of an emoji
+      print("\033[0m")
+      for row in range(len(self.screen) + 1):
+        print("\033[%d;%dH " % (row, len(self.screen[0]) + 1)) 
+
+      # updating keys and mouse position
+      for key in range(512):
+          self.keys[key] = False   
+      self.keys["vpad_up"] = False
+      self.keys["vpad_down"] = False
+      self.keys["vpad_left"] = False
+      self.keys["vpad_right"] = False
+
+      self.oldflags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+      fcntl.fcntl(self.fd, fcntl.F_SETFL, self.oldflags | os.O_NONBLOCK)   
+
+      try:
+        try:
+          c = sys.stdin.read(1)
+          while len(c) > 0:
+            if c == "\033":
+              # escape character detected
+              c = sys.stdin.read(1)      
+              if c == "[":
+                c = sys.stdin.read(1)      
+                if c == "<":
+                  # mouse state updated!
+                  data = ""
+                  c = sys.stdin.read(1)
+                  while len(c) > 0:
+                    data += c
+                    c = sys.stdin.read(1)
+                  coords = data.split(";")
+                  self.mouse_x = int(coords[1]) - 1
+                  m_char = coords[2].find('M')
+                  if m_char == -1:
+                    m_char = coords[2].find('m')
+                  self.mouse_y = int(coords[2][:m_char]) - 1
+                  
+                  if self.mouse_x <= 4:
+                    self.keys["vpad_left"] = True
+                  elif self.mouse_x >= self.width - 4:
+                    self.keys["vpad_right"] = True
+                  if self.mouse_y <= 4:
+                    self.keys["vpad_up"] = True
+                  elif self.mouse_y >= self.height - 4:
+                    self.keys["vpad_down"] = True    
+              else:
+                # escape key pressed, bail
+                self.teardown()
+                return False                  
             else:
-                for x, ch in enumerate(row):
-                    color = self.colour_screen[y][x]
-                    self.win.addstr(y, x, ch, color_pair(color))
+              self.keys[ord(c)] = True
+              # ESCAPE key pressed, finish
+            c = sys.stdin.read(1)                   
+        except IOError: 
+          pass
+      finally:
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, self.oldflags)
 
-        for key in range(512):
-            self.keys[key] = False
-
-        self.win.timeout(int(1000.0 / self.fps))
-        ch = self.win.getch()
-        self.win.timeout(0)
-        while ch != -1:
-            self.keys[ch] = True
-            ch = self.win.getch()
-
+      if self.fps is not None:
+          sleep(1 / self.fps)
+      return True
+                                 
     def isKeyPressed(self, key):
-        return self.keys[ord(key)]
-
-    def getKeysPressed(self):
-        keys = []
-        for key in self.keys.keys():
-            if self.keys[key] == True:
-                keys.append(key)
-        return keys
+      if len(key) == 1:
+        return self.keys[ord(key)]    
+      else:
+        return self.keys[key]
 
     def setFPS(self, fps):
         self.fps = fps
+        
+####################################################################
+#                     Helper functions                             #
+####################################################################        
+from math import copysign
+def getSign(value):
+    return copysign(1, value)
+
+class Sprite:
+  def __init__(self, screen, text = "", x = 0, y = 0):
+    self.screen = screen
+    self.x = x
+    self.y = y
+    self.text = text
+    self.width = len(text)
+
+  def draw(self):
+    self.screen.printAt(self.text, self.x, self.y)
+
+  def contains(self, point, horiz_margin = 0, vert_margin = 0, top_margin = 1, bottom_margin = 2, left_margin = 0, right_margin = 0):
+    if vert_margin > top_margin:
+      top_margin = vert_margin
+    if vert_margin > bottom_margin:
+      bottom_margin = vert_margin
+
+    if horiz_margin > left_margin:
+      left_margin = horiz_margin
+    if horiz_margin > right_margin:
+      right_margin = horiz_margin    
+
+    return point.x >= self.x - left_margin and \
+            point.x <= self.x + len(self.text) + right_margin and \
+            point.y >= self.y - top_margin and \
+            point.y <= self.y + bottom_margin
+'''
+class TimeWeather:
+  cities = ["melbourne", "sydney", "brisbane"]
+
+  weather = { "melbourne": [],
+              "sydney": [],
+              "brisbane": [],}
+
+  def getTemp(city):
+    from requests import get
+    from bs4 import BeautifulSoup    
+
+    current_datetime = TimeWeather.getTime(city)
+    city = city.lower()
+
+    if len(TimeWeather.weather[city]) > 0:
+      if (current_datetime - TimeWeather.weather[city][0]).total_seconds() < 60 * 5:
+        #print("cached weather")
+        return TimeWeather.weather[city][1]
+
+    page = get(f"http://www.bom.gov.au/vic/observations/{city}.shtml")   
+    soup = BeautifulSoup(page.content, 'html.parser')
+    temp = soup.find('tr', class_="rowleftcolumn").find_all('td')[1].text
+    TimeWeather.weather[city] = [current_datetime, temp]
+
+    #print("fetched weather")
+    return temp
+
+  def getTime(city):
+    from datetime import datetime
+    import pytz
+
+    if city.lower() in TimeWeather.cities:
+      tz = pytz.timezone('Australia/' + city.lower()) 
+      return datetime.now(tz)
+    else:
+      raise "Unknown city"  
+'''
