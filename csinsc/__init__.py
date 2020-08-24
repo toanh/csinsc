@@ -127,6 +127,7 @@ class Colour:
     magenta = '\033[35m'
     cyan = '\033[36m'
     white = '\033[37m'
+    orange = '\033[38:5:208:0m%s\033[m\n'
     # TODO: fix black
     black = '\033[30m'
     reset = '\033[0m'
@@ -140,6 +141,7 @@ class Highlight:
     blue = '\033[44m'
     magenta = '\033[45m'
     cyan = '\033[46m'
+    orange = '\033[48:5:208:0m%s\033[m\n'
     # TODO: fix black
     black = '\033[40m'
     white = '\033[47m'
