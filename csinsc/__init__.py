@@ -118,16 +118,18 @@ label = _Label()
 ######################### color constants #########################
 #             abstracted for both termcolour and curses           #
 ###################################################################
+
 class Colour:
     grey = '\033[30m'
     red = '\033[31m'
     green = '\033[32m'
-    yellow = '\033[33m'
+    yellow = '\033[93m'
     blue = '\033[34m'
     magenta = '\033[35m'
+    pink = '\033[35m'
     cyan = '\033[36m'
     white = '\033[37m'
-    orange = '\033[38:5:208:0m%s\033[m\n'
+    orange = '\033[33m'
     # TODO: fix black
     black = '\033[30m'
     reset = '\033[0m'
@@ -137,11 +139,12 @@ class Highlight:
     grey = '\033[40m'
     red = '\033[41m'
     green = '\033[42m'
-    yellow = '\033[43m'
+    yellow = '\033[103m'
     blue = '\033[44m'
     magenta = '\033[45m'
+    pink = '\033[45m'
     cyan = '\033[46m'
-    orange = '\033[48:5:208:0m%s\033[m\n'
+    orange = '\033[43m'
     # TODO: fix black
     black = '\033[40m'
     white = '\033[47m'
